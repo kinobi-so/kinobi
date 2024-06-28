@@ -1,4 +1,15 @@
-import { instructionAccountNode, publicKeyValueNode } from '@kinobi-so/nodes';
+import {
+    accountValueNode,
+    constantPdaSeedNodeFromBytes,
+    hex,
+    instructionAccountNode,
+    pdaNode,
+    pdaSeedValueNode,
+    pdaValueNode,
+    publicKeyTypeNode,
+    publicKeyValueNode,
+    variablePdaSeedNode,
+} from '@kinobi-so/nodes';
 import { expect, test } from 'vitest';
 
 import { instructionAccountNodeFromAnchorV01, instructionAccountNodesFromAnchorV01 } from '../../src';
@@ -35,6 +46,18 @@ test('it flattens nested instruction accounts', () => {
                 },
                 {
                     name: 'account_c',
+                    pda: {
+                        seeds: [
+                            {
+                                kind: 'const',
+                                value: [0, 1, 2, 3],
+                            },
+                            {
+                                kind: 'account',
+                                path: 'account_b',
+                            },
+                        ],
+                    },
                     signer: true,
                     writable: false,
                 },
@@ -51,7 +74,21 @@ test('it flattens nested instruction accounts', () => {
     expect(nodes).toEqual([
         instructionAccountNode({ isSigner: false, isWritable: false, name: 'accountA' }),
         instructionAccountNode({ isSigner: false, isWritable: true, name: 'accountB' }),
-        instructionAccountNode({ isSigner: true, isWritable: false, name: 'accountC' }),
+        instructionAccountNode({
+            defaultValue: pdaValueNode(
+                pdaNode({
+                    name: 'accountC',
+                    seeds: [
+                        constantPdaSeedNodeFromBytes('base16', hex(new Uint8Array([0, 1, 2, 3]))),
+                        variablePdaSeedNode('accountB', publicKeyTypeNode()),
+                    ],
+                }),
+                [pdaSeedValueNode('accountB', accountValueNode('accountB'))],
+            ),
+            isSigner: true,
+            isWritable: false,
+            name: 'accountC',
+        }),
         instructionAccountNode({
             defaultValue: publicKeyValueNode('11111111111111111111111111111111', 'systemProgram'),
             isSigner: false,
