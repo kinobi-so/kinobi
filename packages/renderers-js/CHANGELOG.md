@@ -1,5 +1,15 @@
 # @kinobi-so/renderers-js
 
+## 0.20.10
+
+### Patch Changes
+
+-   Updated dependencies [[`88572e8`](https://github.com/kinobi-so/kinobi/commit/88572e8eaffe09b5b8c48c4e9aebfdeb8bc149e6)]:
+    -   @kinobi-so/visitors-core@0.20.5
+    -   @kinobi-so/renderers-core@0.20.5
+    -   @kinobi-so/errors@0.20.5
+    -   @kinobi-so/nodes@0.20.5
+
 ## 0.20.9
 
 ### Patch Changes
