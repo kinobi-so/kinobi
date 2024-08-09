@@ -37,6 +37,7 @@ export function getTypeManifestVisitor(input: {
         staticVisitor(
             () =>
                 ({
+                    defaultValues: fragment(''),
                     decoder: fragment(''),
                     encoder: fragment(''),
                     isEnum: false,
@@ -111,6 +112,7 @@ export function getTypeManifestVisitor(input: {
                     }
 
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`getBooleanDecoder(${sizeDecoder})`, decoderImports),
                         encoder: fragment(`getBooleanEncoder(${sizeEncoder})`, encoderImports),
                         isEnum: false,
@@ -128,6 +130,7 @@ export function getTypeManifestVisitor(input: {
 
                 visitBytesType() {
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`getBytesDecoder()`).addImports(
                             'solanaCodecsDataStructures',
                             'getBytesDecoder',
@@ -191,6 +194,7 @@ export function getTypeManifestVisitor(input: {
                     const importFrom = node.importFrom ?? 'generatedTypes';
 
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`${decoderFunction}()`).addImports(importFrom, decoderFunction),
                         encoder: fragment(`${encoderFunction}()`).addImports(importFrom, encoderFunction),
                         isEnum: false,
@@ -205,6 +209,7 @@ export function getTypeManifestVisitor(input: {
                     const name = nameApi.discriminatedUnionVariant(enumEmptyVariantType.name);
                     const kindAttribute = `${discriminator}: "${name}"`;
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`['${name}', getUnitDecoder()]`).addImports(
                             'solanaCodecsDataStructures',
                             'getUnitDecoder',
@@ -303,6 +308,7 @@ export function getTypeManifestVisitor(input: {
                         }
                         const variantNames = enumType.variants.map(({ name }) => nameApi.enumVariant(name));
                         return {
+                            defaultValues: fragment(''),
                             decoder: fragment(
                                 `getEnumDecoder(${currentParentName.strict + decoderOptionsAsString})`,
                                 decoderImports.add('solanaCodecsDataStructures', 'getEnumDecoder'),
@@ -483,6 +489,7 @@ export function getTypeManifestVisitor(input: {
                         endianness = '{ endian: Endian.Big }';
                     }
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`${decoderFunction}(${endianness})`, decoderImports),
                         encoder: fragment(`${encoderFunction}(${endianness})`, encoderImports),
                         isEnum: false,
@@ -609,6 +616,7 @@ export function getTypeManifestVisitor(input: {
                 visitPublicKeyType() {
                     const imports = new ImportMap().add('solanaAddresses', 'type Address');
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment('getAddressDecoder()').addImports('solanaAddresses', 'getAddressDecoder'),
                         encoder: fragment('getAddressEncoder()').addImports('solanaAddresses', 'getAddressEncoder'),
                         isEnum: false,
@@ -747,6 +755,7 @@ export function getTypeManifestVisitor(input: {
                         }
                     })();
                     return {
+                        defaultValues: fragment(''),
                         decoder: fragment(`${decoder}()`).addImports('solanaCodecsStrings', decoder),
                         encoder: fragment(`${encoder}()`).addImports('solanaCodecsStrings', encoder),
                         isEnum: false,
@@ -816,19 +825,36 @@ export function getTypeManifestVisitor(input: {
                         return mergedManifest;
                     }
 
+                    const getConstantKey = (name: string) => {
+                        const structName = parentName?.strict ?? '';
+                        return nameApi.typeConstant(`${structName}_${name}`);
+                    }
+
                     const defaultValues = optionalFields
                         .map(f => {
-                            const key = camelCase(f.name);
+                            const constantKey = getConstantKey(f.name);
                             const defaultValue = f.defaultValue as NonNullable<typeof f.defaultValue>;
                             const { render: renderedValue, imports } = visit(defaultValue, self).value;
-                            mergedManifest.encoder.mergeImportsWith(imports);
+                            mergedManifest.defaultValues.mergeImportsWith(imports);
+                            return `export const ${constantKey} = ${renderedValue}`;
+                        })
+                        .join('\n');
+
+                    mergedManifest.defaultValues
+                        .mapRender(r => `${r}\n${defaultValues}`);
+
+                    const presetValues = optionalFields
+                        .map(f => {
+                            const key = camelCase(f.name);
+                            const constantKey = getConstantKey(f.name);
                             return f.defaultValueStrategy === 'omitted'
-                                ? `${key}: ${renderedValue}`
-                                : `${key}: value.${key} ?? ${renderedValue}`;
+                                ? `${key}: ${constantKey}`
+                                : `${key}: value.${key} ?? ${constantKey}`;
                         })
                         .join(', ');
+
                     mergedManifest.encoder
-                        .mapRender(r => `transformEncoder(${r}, (value) => ({ ...value, ${defaultValues} }))`)
+                        .mapRender(r => `transformEncoder(${r}, (value) => ({ ...value, ${presetValues} }))`)
                         .addImports('solanaCodecsCore', 'transformEncoder');
                     return mergedManifest;
                 },
